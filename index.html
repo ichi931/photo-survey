@@ -120,6 +120,7 @@ body.selmode #selbar{display:flex}
 #upd{position:fixed;left:10px;right:10px;top:calc(8px + env(safe-area-inset-top));z-index:120;background:#263238;color:#fff;border-radius:10px;padding:10px 12px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.35);font-size:14px}
 #upd span{flex:1}#upd button{min-height:36px}
 #ver{font-size:11px;color:var(--sub);text-align:center;margin-top:10px}
+.mdiff{font-size:13px;line-height:1.6;margin:6px 0}.mdiff td{padding:2px 8px 2px 0;vertical-align:top}.mdiff .a{color:#2e7d32}.mdiff .d{color:#c62828}
 .pv canvas{width:100%;max-width:620px;display:block;margin:10px auto;box-shadow:0 2px 8px rgba(0,0,0,.2);background:#fff}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
 .chks{display:flex;flex-wrap:wrap;gap:0 14px}
@@ -260,6 +261,13 @@ body.selmode #selbar{display:flex}
 
 <!-- ④ マスター -->
 <section class="tab" id="tab-master">
+ <div class="box">
+  <h3>マスターの共有（スマホ⇔PC・他の人）</h3>
+  <div class="bar"><button id="mExp" class="pri">📤 マスター書き出し</button><button id="mImp">📥 マスター読み込み</button></div>
+  <p class="note">マスターだけをファイルにして受け渡しします。写真・グループ・物件情報には影響しません。<br>
+  「置き換え」は削除・名称変更・並び順まで含めて同じマスターにします。「追加」は足りない項目だけを末尾に足します。<br>
+  写真全体のバックアップファイル（.json）からマスターだけを読み込むこともできます。</p>
+ </div>
  <p class="note">選択肢を編集できます。名称を変更すると、その値が入っている写真も自動で書き換わります。</p>
  <div class="mgrid" id="masterWrap"></div>
 </section>
@@ -337,6 +345,7 @@ body.selmode #selbar{display:flex}
 <input type="file" id="inLib" accept="image/*" multiple hidden>
 <input type="file" id="inPick" accept="image/*" multiple hidden>
 <input type="file" id="inBk" accept=".json,application/json" hidden>
+<input type="file" id="inMaster" accept=".json,application/json" hidden>
 
 <script>
 'use strict';
@@ -894,6 +903,7 @@ $('#bkLoad').onclick=()=>$('#inBk').click();
 $('#inBk').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;let d;
  try{busy('バックアップを読み込み中…');d=JSON.parse(await f.text())}catch(err){unbusy();return toast('バックアップファイルを読み込めません')}unbusy();
  if(!d||d.app!=='photoSeiri')return toast('このアプリのバックアップではありません');
+ if(d.type==='master')return toast('マスターのファイルです。④マスターの「📥マスター読み込み」から読み込んでください');
  modal('バックアップから復元',`<p>写真 ${d.photos.length}枚を含むバックアップです。</p><p class="note">「追加」：今のデータに追加（同じ写真は上書き）<br>「置き換え」：今のデータを消して復元</p>`,
   [{label:'キャンセル'},{label:'追加',onClick:()=>restore(d,false)},{label:'置き換え',cls:'dng',onClick:()=>restore(d,true)}])};
 async function restore(d,replace){closeModal();
@@ -933,6 +943,47 @@ $('#masterWrap').addEventListener('click',async e=>{const b=e.target.closest('bu
  await saveState();renderMaster();renderFilters();renderList()});
 $('#masterWrap').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('[data-add]')){e.preventDefault();$('button[data-a="add"]',e.target.closest('[data-mk]')).click()}});
 
+/* ---- マスター書き出し・読み込み ---- */
+$('#mExp').onclick=()=>{
+ const out={app:'photoSeiri',type:'master',ver:1,saved:Date.now(),
+  source:[S.prop.name,S.prop.surveyor].filter(Boolean).join(' / '),master:clone(S.master)};
+ const cnt=FIELDS.map(([,mk,l])=>`${l}${S.master[mk].length}`).join('・');
+ const nm=`写真整理マスター_${ymd(Date.now())}.json`;
+ offerFile(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}),nm);
+ toast(`書き出し：${cnt}`)};
+$('#mImp').onclick=()=>$('#inMaster').click();
+$('#inMaster').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ let d;try{d=JSON.parse(await f.text())}catch(err){return toast('ファイルを読み込めません')}
+ if(!d||d.app!=='photoSeiri')return toast('このアプリのファイルではありません');
+ const src=d.type==='master'?d.master:(d.state&&d.state.master);
+ if(!src||typeof src!=='object')return toast('マスターが含まれていません');
+ const inc={};
+ for(const [,mk] of FIELDS){const v=src[mk];if(Array.isArray(v))inc[mk]=[...new Set(v.map(x=>String(x).trim()).filter(Boolean))]}
+ const keys=Object.keys(inc);if(!keys.length)return toast('マスターが含まれていません');
+ const rows=FIELDS.filter(([,mk])=>inc[mk]).map(([k,mk,l])=>{const cur=S.master[mk],nw=inc[mk];
+  const add=nw.filter(x=>!cur.includes(x)),del=cur.filter(x=>!nw.includes(x));
+  const used=del.filter(x=>S.photos.some(p=>p[k]===x));
+  const same=!add.length&&!del.length&&cur.join('\n')===nw.join('\n');
+  return `<tr><td><b>${l}</b></td><td>${same?'変更なし':`${cur.length}→${nw.length}項目`+
+   (add.length?`<br><span class="a">＋${esc(add.join('、'))}</span>`:'')+
+   (del.length?`<br><span class="d">－${esc(del.join('、'))}</span>`:'')+
+   (used.length?`<br><span class="note">※${esc(used.join('、'))} は写真で使用中（写真の値は残ります）</span>`:'')+
+   (!add.length&&!del.length?'<br>並び順のみ変更':'')}</td></tr>`}).join('');
+ const info=[d.type==='master'?'マスターファイル':'バックアップファイル内のマスター',d.saved?fmtDT(d.saved):'',d.source||''].filter(Boolean).join(' ／ ');
+ modal('マスター読み込み',`<p class="note">${esc(info)}</p>
+  <p style="margin:6px 0 2px;font-size:13px">「置き換え」した場合の変更内容：</p><table class="mdiff">${rows}</table>
+  <p class="note">「置き換え」：上の内容でこの端末のマスターを置き換えます（削除・名称変更・並び順も反映）。<br>「追加」：足りない項目だけを末尾に追加します（削除・並び順は変えません）。</p>`,
+  [{label:'キャンセル'},
+   {label:'追加',onClick:()=>applyMaster(inc,false)},
+   {label:'置き換え',cls:'pri',onClick:()=>applyMaster(inc,true)}])};
+async function applyMaster(inc,replace){let n=0;
+ for(const [k,mk] of FIELDS){const nw=inc[mk];if(!nw)continue;
+  if(replace){S.master[mk]=nw.slice();n++}
+  else{for(const v of nw)if(!S.master[mk].includes(v)){S.master[mk].push(v);n++}}
+  if(replace&&S.view[k]&&S.view[k]!=='__none'&&!nw.includes(S.view[k]))S.view[k]=''}
+ await saveState();renderMaster();renderFilters();renderList();
+ if(E.open)fillEdForm();
+ toast(replace?'マスターを置き換えました':(n?`${n}項目を追加しました`:'追加する項目はありませんでした'))}
 /* ================= タブ ================= */
 $$('nav.tabs button').forEach(b=>b.onclick=()=>{const t=b.dataset.tab;$$('nav.tabs button').forEach(x=>x.classList.toggle('act',x===b));
  $$('.tab').forEach(x=>x.classList.toggle('act',x.id==='tab-'+t));document.body.classList.toggle('tPhotos',t==='photos');

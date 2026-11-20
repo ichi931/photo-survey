@@ -1,6 +1,6 @@
 /* 写真整理アプリ Service Worker
-   ★アプリを更新したら VERSION の番号を必ず上げてください（例 v1.1.0 → v1.1.1） */
-const VERSION = 'v1.1.0';
+   ★アプリを更新したら VERSION の番号を必ず上げてください（例 v1.2.0 → v1.2.1） */
+const VERSION = 'v1.2.0';
 const CACHE = 'photo-seiri-' + VERSION;
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
