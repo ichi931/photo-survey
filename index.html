@@ -376,7 +376,7 @@ const FIELDS=[['loc','locs','場所'],['part','parts','部位'],['finish','finis
 const DEF_LEDGER={per:4,target:'all',ann:true,hq:false,title:'写真台帳',fields:{date:true,loc:true,part:true,finish:true,det:true,work:true,group:false,memo:true},pattern:'{code}_{no}_{loc}_{part}_{det}',zipAnn:true,zipCsv:true};
 
 const S={photos:[],groups:[],master:clone(DEF_MASTER),
- prop:{name:'',code:'',date:'',surveyor:'',maxPx:1600},
+ prop:{name:'',code:'',date:'',surveyor:'',maxPx:1200},
  view:{q:'',loc:'',part:'',finish:'',det:'',work:'',group:'',fav:false,sort:'dateAsc',groupBy:'none'},
  ledger:clone(DEF_LEDGER),selMode:false,sel:new Set(),flat:[],collapsed:new Set()};
 const byId=id=>S.photos.find(p=>p.id===id);
@@ -419,7 +419,7 @@ async function addFiles(files,{open=false}={}){
    if(files.length>1)busy(`写真を取り込み中… ${i+1}/${files.length}`);
    const f=files[i];let im;
    try{im=await blobToImg(f)}catch(e){toast(`${f.name} は読み込めませんでした`);continue}
-   const cv=scaleTo(im,+S.prop.maxPx||1600);const blob=await toBlobP(cv,'image/jpeg',.85);
+   const cv=scaleTo(im,+S.prop.maxPx||1200);const blob=await toBlobP(cv,'image/jpeg',.85);
    const tc=scaleTo(im,320);const thumb=tc.toDataURL('image/jpeg',.72);URL.revokeObjectURL(im._u);
    const keep=x=>x&&x!=='__none'?x:'';
    const p={id:uid(),name:f.name||'photo.jpg',created:f.lastModified||Date.now(),seq:Date.now()+(seq++),
@@ -884,7 +884,7 @@ $('#lgZip').onclick=async()=>{const it=ledgerItems();if(!it.length)return toast(
 
 /* ================= ③ 物件設定 ================= */
 function renderHeader(){const P=S.prop;$('#hProp').textContent=[P.name,P.code].filter(Boolean).join('／')}
-function renderProp(){const P=S.prop;$('#pName').value=P.name;$('#pCode').value=P.code;$('#pDate').value=P.date;$('#pBy').value=P.surveyor;$('#pMax').value=String(P.maxPx||1600)}
+function renderProp(){const P=S.prop;$('#pName').value=P.name;$('#pCode').value=P.code;$('#pDate').value=P.date;$('#pBy').value=P.surveyor;$('#pMax').value=String(P.maxPx||1200)}
 [['pName','name'],['pCode','code'],['pDate','date'],['pBy','surveyor'],['pMax','maxPx']].forEach(([id,k])=>{
  $('#'+id).addEventListener('input',e=>{S.prop[k]=k==='maxPx'?+e.target.value:e.target.value;saveStateLater();renderHeader();renderLedgerInfo()})});
 async function renderStat(){const n=S.photos.length;let t=`写真 ${n}枚 ／ グループ ${S.groups.length}件`;
